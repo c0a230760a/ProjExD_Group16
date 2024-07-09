@@ -12,7 +12,7 @@ HEIGHT = 720  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #global変数の追加
-gameround = 1
+gameround = 3
 
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
@@ -269,8 +269,8 @@ class Enemy(pg.sprite.Sprite):
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
         
-        if gameround <= 1:
-            self.vx += 1.5 if random.choice([True,False]) else -1
+        if gameround >= 2:
+            self.vx += 1.5 if random.choice([True,False]) else -2
             self.rect.move_ip(self.vx, self.vy)
             if self.rect.left < 0:
                 self.rect.left = 0
@@ -427,7 +427,7 @@ def main():
         screen.blit(bg_img, [0, 0])
 
         if gameround == 0:
-            if tmr%200 == 0:  # 200フレーム，敵機を出現させる
+            if tmr%250 == 0:  # 200フレーム，敵機を出現させる
                 for _ in range(1):
                     emys.add(Enemy())
         elif gameround == 1:
@@ -435,11 +435,11 @@ def main():
                 for _ in range(2):  # 敵機の数
                     emys.add(Enemy())
         elif gameround == 2:
-            if tmr%150 == 0:  # 200フレーム，敵機を出現させる
+            if tmr%170 == 0:  # 200フレーム，敵機を出現させる
                 for _ in range(4):  # 敵機の数
                     emys.add(Enemy())
         elif gameround == 3:
-            if tmr%100 == 0:  # 200フレーム，敵機を出現させる
+            if tmr%80 == 0:  # 200フレーム，敵機を出現させる
                 for _ in range(5):  # 敵機の数
                     emys.add(Enemy())
 
