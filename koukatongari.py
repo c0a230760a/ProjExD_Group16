@@ -270,7 +270,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 10000
+        self.value = 0
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -343,7 +343,67 @@ class Shield(pg.sprite.Sprite):
         self.life -= 1
         if self.life < 0:
             self.kill()
+
+# 各ラウンドの背景と移動   
+class Round:
+    def __init__(self):
+        self.current_round = 0 # 現在のラウンド番号
+        self.backgrounds = [pg.image.load(f"fig/round{i}.jpg") for i in range(1, 6)]
+        self.bg_pos = -HEIGHT # 背景画像の位置(画面外)
+        self.transition_time = 120 # トランジションの時間
+        self.is_transitioning = True
+        self.required_scores = [0, 100, 300, 600, 1000]  # 各ラウンドに必要なスコア
+
+    def update(self, screen, score):
+        if self.is_transitioning:
+            if self.transition_time > 60:  # 最初の1秒間は黒画面にテキスト表示
+                self.transition_time -= 1
+                screen.fill((0, 0, 0)) # 画面を黒で塗りつぶす
+                font = pg.font.Font(None, 64)
+                if self.current_round == 4: # 最終ラウンド
+                    text = font.render("Final Round", True, (255, 255, 255))
+                else: # 1～4ラウンド
+                    text = font.render(f"Round{self.current_round + 1}", True, (255, 255, 255))
+                text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+                screen.blit(text, text_rect)
+            elif self.transition_time > 0:  # 次の1秒間で背景をスライドイン
+                self.transition_time -= 1
+                self.bg_pos += HEIGHT / 60  # 1秒(60フレーム)かけて画面を下に移動
+                screen.blit(self.backgrounds[self.current_round], (0, self.bg_pos))
+            else:
+                self.is_transitioning = False
+                self.bg_pos = 0
+        else:
+            screen.blit(self.backgrounds[self.current_round], (0, 0))
+
+        # スコアに基づいてラウンドを更新
+        if self.current_round < 4 and score.value >= self.required_scores[self.current_round + 1]:
+            self.next_round()
+
+    def next_round(self):
+        if self.current_round < 4:
+            self.current_round += 1
+            self.is_transitioning = True
+            self.transition_time = 120  # 2秒間のトランジション（1秒テキスト表示 + 1秒背景スライド）
+            self.bg_pos = -HEIGHT  # 背景位置をリセット
+        
  
+def show_title_screen(screen):
+    """
+    タイトル画面を表示する関数
+    引数 screen：画面Surface
+    """
+    font = pg.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 50)
+    title = font.render("鳥の悪魔討伐", True, (255, 255, 255))
+    instruction = font.render("Press S to Start", True, (255, 255, 255))
+    
+    screen.fill((0, 0, 0))  # 画面を黒で塗りつぶす
+    title_rect = title.get_rect(center=(WIDTH//2, HEIGHT//2 - 50))
+    instruction_rect = instruction.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+    screen.blit(title, title_rect)
+    screen.blit(instruction, instruction_rect)
+    pg.display.update()
+
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -359,8 +419,20 @@ def main():
     shields = pg.sprite.Group()
     gvys = pg.sprite.Group()
 
+    round_manager = Round()
+
     tmr = 0
     clock = pg.time.Clock()
+
+    show_title_screen(screen)
+    title_screen = True
+    while title_screen:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return 0
+            if event.type == pg.KEYDOWN and event.key == pg.K_s:
+                title_screen = False
+
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
@@ -386,47 +458,53 @@ def main():
             score.value -= 100
         screen.blit(bg_img, [0, 0])
 
+        if round_manager.is_transitioning:
+            screen.fill((0, 0, 0))  # 黒い背景を描画
+        else:
+            screen.blit(bg_img, [0, 0])  # 通常の背景を描画
+        round_manager.update(screen, score)
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
-            emys.add(Enemy())
+        if not round_manager.is_transitioning:
+            if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+                emys.add(Enemy())
 
-        for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+            for emy in emys:
+                if emy.state == "stop" and tmr%emy.interval == 0:
+                    # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+                    bombs.add(Bomb(emy, bird))
 
-        for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
-            exps.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += 10  # 10点アップ
-            bird.change_img(6, screen)  # こうかとん喜びエフェクト
+            for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
+                exps.add(Explosion(emy, 100))  # 爆発エフェクト
+                score.value += 10  # 10点アップ
+                bird.change_img(6, screen)  # こうかとん喜びエフェクト
 
-        for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
-            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-            score.value += 1  # 1点アップ
-        
-        for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
-            exps.add(Explosion(bomb, 50))
-
-        for emy in pg.sprite.groupcollide(emys, gvys, True, False).keys():
-            gvys.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += 10
-
-        for bomb in pg.sprite.groupcollide(bombs, gvys, True, False).keys():
-            gvys.add(Explosion(bomb, 50))
-            score.value += 1
-
-        if bird.state == "hyper":
-            for bomb in pg.sprite.spritecollide(bird, bombs, True):
+            for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
                 exps.add(Explosion(bomb, 50))  # 爆発エフェクト
                 score.value += 1  # 1点アップ
-        
-        else:
-            if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
-                bird.change_img(8, screen) # こうかとん悲しみエフェクト
-                score.update(screen)
-                pg.display.update()
-                time.sleep(2)
-                return
+            
+            for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
+                exps.add(Explosion(bomb, 50))
+
+            for emy in pg.sprite.groupcollide(emys, gvys, True, False).keys():
+                gvys.add(Explosion(emy, 100))  # 爆発エフェクト
+                score.value += 10
+
+            for bomb in pg.sprite.groupcollide(bombs, gvys, True, False).keys():
+                gvys.add(Explosion(bomb, 50))
+                score.value += 1
+
+            if bird.state == "hyper":
+                for bomb in pg.sprite.spritecollide(bird, bombs, True):
+                    exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+                    score.value += 1  # 1点アップ
+            
+            else:
+                if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+                    bird.change_img(8, screen) # こうかとん悲しみエフェクト
+                    score.update(screen)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
         
 
         bird.update(key_lst, screen)
