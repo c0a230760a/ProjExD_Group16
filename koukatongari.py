@@ -360,8 +360,8 @@ class NormalWeapon(Weapon):
     def __init__(self, bird: Bird, beam_x: int = 0, speed: int = 10):
         super().__init__(bird, speed)
         img = pg.image.load(f"fig/beam.png")
-        small_image = pg.transform.scale(img, (img.get_width() // 3, img.get_height() // 3))
-        self.image = pg.transform.rotozoom(small_image, 90, 2.0)
+        small_image = pg.transform.scale(img, (img.get_width() // 2, img.get_height() // 2))
+        self.image = pg.transform.rotozoom(small_image, 90, 1)
         self.rect = self.image.get_rect()
         self.rect.centerx = bird.rect.centerx + beam_x
         self.rect.bottom = bird.rect.top
@@ -505,6 +505,18 @@ class BoomerangWeapon(Weapon):
             # こうかとんに当たったら消滅
             if self.rect.colliderect(self.bird.rect):
                 self.kill()
+    
+class GetItem(pg.sprite.Sprite):
+    def __init__(self, img: pg.surface.Surface, downsize: int, angle: int, xy: tuple):
+        super().__init__()
+        small_image = pg.transform.scale(img, (img.get_width() // downsize, img.get_height() // downsize))
+        self.small_image = pg.transform.rotozoom(small_image, angle, 1)
+        self.rect = self.small_image.get_rect()
+        self.rect.center = xy
+    
+    def update(self, screen: pg.Surface):
+        screen.blit(self.small_image, self.rect)
+
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -520,6 +532,7 @@ def main():
     shields = pg.sprite.Group()
     gvys = pg.sprite.Group()
     weapons = pg.sprite.Group()
+    items = pg.sprite.Group()
     tmr = 0
     num_barriers = 3
     angle = 360 / num_barriers
@@ -527,6 +540,7 @@ def main():
     weapon_timer = {"bullet":0, "satellite":0, "slash":0, "boomerang":0}
     weapon_dict = {"weapon_mode":0, "satellite":2, "slash":0, "boomerang":1}
     clock = pg.time.Clock()
+    count = 0
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
@@ -544,7 +558,12 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value > 200:
                 gvys.add(Gravity(400))
                 score.value -= 200
-
+        """ここはテストプログラム"""
+        if count == 0:
+            count += 1
+            item_img = pg.image.load(f"fig/beam.png")
+            items.add(GetItem(item_img, downsize=2, angle=90, xy=(100, 100)))
+        """"""
         for i in weapon_cooldown:
             weapon_timer[i] += 1
         if weapon_timer["bullet"] >= weapon_cooldown["bullet"] and weapon_dict["weapon_mode"] != 2:
@@ -691,7 +710,10 @@ def main():
                 time.sleep(2)
                 return
         
+        for item in pg.sprite.spritecollide(bird, items, True):
+            weapon_dict["weapon_mode"] = 1
 
+        items.update(screen)
         bird.update(key_lst, screen)
         # beams.update()
         # beams.draw(screen)
