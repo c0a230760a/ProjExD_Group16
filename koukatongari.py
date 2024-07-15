@@ -343,8 +343,11 @@ class Shield(pg.sprite.Sprite):
         if self.life < 0:
             self.kill()
 
-class Weapon(pg.sprite.Sprite):
-    def __init__(self, bird, speed = 10):
+class Weapon(pg.sprite.Sprite): 
+    """
+    武器の親クラス
+    """
+    def __init__(self, bird: Bird, speed:int = 10):
         super().__init__()
         self.bird = bird
         self.speed = speed
@@ -357,7 +360,16 @@ class Weapon(pg.sprite.Sprite):
             self.kill()
 
 class NormalWeapon(Weapon):
+    """
+    通常弾に関するクラス
+    """
     def __init__(self, bird: Bird, beam_x: int = 0, speed: int = 10):
+        """
+        武器画像Surfaceを生成する
+        引数1 bird：武器を発射するこうかとん
+        引数2 ビームのX位置のオフセット
+        引数3 ビームのスピード
+        """
         super().__init__(bird, speed)
         img = pg.image.load(f"fig/beam.png")
         small_image = pg.transform.scale(img, (img.get_width() // 2, img.get_height() // 2))
@@ -369,35 +381,41 @@ class NormalWeapon(Weapon):
         self.vy = -self.speed  # デフォルトで上方向に移動
 
     def update(self):
-        self.rect.x += self.vx
-        self.rect.y += self.vy
+        self.rect.move_ip(0, -self.speed)  # 常に上方向に移動
         super().update()
 
-class PenetWeapon(Weapon):
-    """敵と衝突しても消えない弾"""
+class PenetWeapon(NormalWeapon):
+    """
+    敵と衝突しても消えない弾に関するクラス
+    """
     def __init__(self, bird: Bird, beam_x: int = 0, speed: int = 10):
         """
         武器画像Surfaceを生成する
-        引数 bird：武器を発射するこうかとん
+        引数1 bird：武器を発射するこうかとん
+        引数2 ビームのX位置のオフセット
+        引数3 ビームのスピード
         """
-        super().__init__(bird, speed)
-        img = pg.image.load(f"fig/beam.png")
-        small_image = pg.transform.scale(img, (img.get_width() // 3, img.get_height() // 3))
-        self.image = pg.transform.rotozoom(small_image, 90, 2.0)  # 常に上向き
+        super().__init__(bird, beam_x, speed)
         self.image = pg.transform.laplacian(self.image)  # 区別をつける
-        self.rect = self.image.get_rect()
-        self.rect.centerx = bird.rect.centerx + beam_x
-        self.rect.bottom = bird.rect.top  # こうかとんの上端に配置
   
     def update(self):
         """
         武器を上方向に移動させる
         """
-        self.rect.move_ip(0, -self.speed)  # 常に上方向に移動
         super().update()
 
 class SatelliteWeapon(Weapon):
+    """
+    こうかとんの周りを周回する衛星に関するクラス
+    """
     def __init__(self, bird: Bird, radius: int = 200, angle : int = 0, angular_speed: float = 0.1):
+        """
+        武器画像Surfaceを生成する
+        引数1 bird：武器を発射するこうかとん
+        引数2 周回する半径
+        引数3 周回する初期角度
+        引数4 周回速度
+        """
         super().__init__(bird)
         self.radius = radius
         self.angle = math.radians(angle)
@@ -408,6 +426,9 @@ class SatelliteWeapon(Weapon):
         self.rect = self.image.get_rect()
 
     def update(self):
+        """
+        武器を周回させる
+        """
         x = self.bird.rect.centerx + math.cos(self.angle) * self.radius
         y = self.bird.rect.centery + math.sin(self.angle) * self.radius
         self.rect.center = (x, y)
@@ -417,12 +438,15 @@ class SatelliteWeapon(Weapon):
 
 class ShootingSatelliteWeapon(SatelliteWeapon):
     bullets = pg.sprite.Group()
-    def __init__(self, bird: Bird, radius: int = 200, angle: int = 0, angular_speed: float = 0.1):
+    def __init__(self, bird: Bird, radius: int = 200, angle: int = 0, angular_speed: float = 0.1, shoot_cooldown: int = 50):
         super().__init__(bird, radius, angle, angular_speed)
-        self.shoot_cooldown = 50  # 発射間隔（フレーム数）
+        self.shoot_cooldown = shoot_cooldown  # 発射間隔（フレーム数）
         self.shoot_timer = 0
 
     def update(self):
+        """
+        武器を周回させると弾の発射
+        """
         # 衛星の位置を更新
         super().update()
 
@@ -439,7 +463,15 @@ class ShootingSatelliteWeapon(SatelliteWeapon):
 
 
 class SlashWeapon(Weapon):
-    def __init__(self, bird: Bird):
+    """
+    斬撃に関するクラス
+    """
+    def __init__(self, bird: Bird, hp: int = 10):
+        """
+        武器画像Surfaceを生成する
+        引数1 bird：武器を発射するこうかとん
+        引数2 斬撃の残留時間
+        """
         super().__init__(bird)
         self.vx, self.vy = bird.dire
         angle = math.degrees(math.atan2(-self.vy, self.vx))
@@ -451,50 +483,59 @@ class SlashWeapon(Weapon):
         self.vy = -math.sin(math.radians(angle))
         self.rect = self.image.get_rect()
         self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
-        self.hp = 10
+        self.ret.centerx = bird.rect.centerx+bird.rect.width*self.vx
+        self.hp =hp
     
     def update(self):
         """
-        ビームを速度ベクトルself.vx, self.vyに基づき移動させる
-        引数 screen：画面Surface
+        斬撃の残留管理
         """
-        # self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         self.hp -= 1
-        print(self.hp)
         if self.hp <= 0:
             self.kill()
 
 class BoomerangWeapon(Weapon):
-    def __init__(self, bird: Bird):
-        super().__init__(bird)
+    """
+    ブーメランに関するクラス
+    """
+    def __init__(self, bird: Bird, speed: int = 5, max_distance: int = 300, rotation_speed: int = 10):
+        """
+        武器画像Surfaceを生成する
+        引数1 bird：武器を発射するこうかとん
+        引数2 ブーメランのスピード
+        引数3 ブーメランの最大距離
+        引数4 ブーメランの回転速度
+        """
+        super().__init__(bird, speed)
         self.original_image = pg.Surface((50, 50))
         self.original_image.set_colorkey((0, 0, 0))
         pg.draw.circle(self.original_image, (255, 0, 0), (25, 25), 25)
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rect.center = bird.rect.center
-        self.speed = 5
-        self.max_distance = 300  # ブーメランが飛ぶ最大距離
+        self.max_distance = max_distance
         self.distance = 0
         self.returning = False
         self.angle = 0
-        self.rotation_speed = 10  # 回転速度
+        self.rotation_speed = rotation_speed
 
     def update(self):
+        """
+        ブーメランの移動
+        """
         # ブーメランを回転させる
         self.angle = (self.angle + self.rotation_speed) % 360
         self.image = pg.transform.rotate(self.original_image, self.angle)
         self.rect = self.image.get_rect(center=self.rect.center)
 
         if not self.returning:
-            # 前進
+            # 前進するときの処理
             self.rect.move_ip(0, -self.speed)
             self.distance += self.speed
             if self.distance >= self.max_distance:
                 self.returning = True
         else:
-            # 戻る
+            # 戻るときの処理
             dx = self.bird.rect.centerx - self.rect.centerx
             dy = self.bird.rect.centery - self.rect.centery
             dist = math.hypot(dx, dy)
@@ -507,15 +548,32 @@ class BoomerangWeapon(Weapon):
                 self.kill()
     
 class GetItem(pg.sprite.Sprite):
-    def __init__(self, img: pg.surface.Surface, downsize: int, angle: int, xy: tuple):
+    """
+    アイテムに関するクラス
+    """
+    def __init__(self, img_name: str, downsize: int, angle: int, xy: tuple, item_name: str):
+        """
+        アイテム画像Surfaceを生成する
+        引数1 アイテムの画像の保存場所と名前
+        引数2 アイテムの縮小具合
+        引数3 アイテムの角度
+        引数4 アイテムの生成位置
+        引数5 アイテムの名前
+        """
         super().__init__()
+        img = pg.image.load(img_name)
         small_image = pg.transform.scale(img, (img.get_width() // downsize, img.get_height() // downsize))
         self.small_image = pg.transform.rotozoom(small_image, angle, 1)
         self.rect = self.small_image.get_rect()
         self.rect.center = xy
+        self.item_name = item_name
     
     def update(self, screen: pg.Surface):
+        """
+        画像の描画
+        """
         screen.blit(self.small_image, self.rect)
+        
 
 
 def main():
@@ -536,9 +594,9 @@ def main():
     tmr = 0
     num_barriers = 3
     angle = 360 / num_barriers
-    weapon_cooldown ={"bullet":7, "satellite":30, "slash":20, "boomerang":20}  # 30フレーム（約0.6秒）ごとに発射
+    weapon_cooldown ={"bullet":70, "satellite":30, "slash":20, "boomerang":20}  # 30フレーム（約0.6秒）ごとに発射
     weapon_timer = {"bullet":0, "satellite":0, "slash":0, "boomerang":0}
-    weapon_dict = {"weapon_mode":0, "satellite":2, "slash":0, "boomerang":1}
+    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
     clock = pg.time.Clock()
     count = 0
     while True:
@@ -561,19 +619,21 @@ def main():
         """ここはテストプログラム"""
         if count == 0:
             count += 1
-            item_img = pg.image.load(f"fig/beam.png")
-            items.add(GetItem(item_img, downsize=2, angle=90, xy=(100, 100)))
-        """"""
+            item_img = f"fig/beam.png"
+            items.add(GetItem(item_img, downsize=2, angle=90, xy=(100, 100), item_name="weapon_mode"))
+        """ここまでテストプログラム"""
+        """武器の発射処理"""
         for i in weapon_cooldown:
             weapon_timer[i] += 1
         if weapon_timer["bullet"] >= weapon_cooldown["bullet"] and weapon_dict["weapon_mode"] != 2:
             if weapon_dict["weapon_mode"] == 0:
-                weapons.add(NormalWeapon(bird, 10, 10))
+                weapons.add(NormalWeapon(bird, 10))
                 weapons.add(NormalWeapon(bird, -10))
             elif weapon_dict["weapon_mode"] == 1:
                 weapons.add(PenetWeapon(bird, 10))
                 weapons.add(PenetWeapon(bird, -10))
             weapon_timer["bullet"] = 0
+        # 弾丸
         if weapon_timer["satellite"] >= weapon_cooldown["satellite"]:
             if weapon_dict["satellite"] == 1:
                 # SatelliteWeaponを削除
@@ -597,17 +657,17 @@ def main():
                         ten = angle * i
                         weapons.add(ShootingSatelliteWeapon(bird, 75, ten))
             weapon_timer["satellite"] = 0
-        
+        # 衛星弾
         if weapon_timer["slash"] >= weapon_cooldown["slash"]:
             if weapon_dict["slash"] == 1:
                 weapons.add(SlashWeapon(bird))
             weapon_timer["slash"] = 0
-
+        # 斬撃
         if weapon_timer["boomerang"] >= weapon_cooldown["boomerang"]:
             if weapon_dict["boomerang"] == 1:
                 weapons.add(BoomerangWeapon(bird))
             weapon_timer["boomerang"] = 0
-
+        # ブーメラン
         # 課題4main
         if event.type == pg.KEYDOWN and key_lst[pg.K_RSHIFT] == True and score.value >= 100:
             bird.state = "hyper"
@@ -623,7 +683,8 @@ def main():
             if emy.state == "stop" and tmr%emy.interval == 0:
                 # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
-        
+
+        """武器の衝突処理"""
         if weapon_dict["weapon_mode"] == 0:
             """weaponmodeがnormal(ノーマル)のときの衝突処理"""
             for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
@@ -643,7 +704,7 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))  # 爆発エフェクト
                 score.value += 1  # 1点アップ
-        
+
         if weapon_dict["satellite"] == 1:
             for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
                 exps.add(Explosion(emy, 100))
@@ -685,7 +746,7 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
-
+        """追加武器の衝突処理終了"""
         for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
             exps.add(Explosion(bomb, 50))
 
@@ -710,8 +771,8 @@ def main():
                 time.sleep(2)
                 return
         
-        for item in pg.sprite.spritecollide(bird, items, True):
-            weapon_dict["weapon_mode"] = 1
+        for item in pg.sprite.spritecollide(bird, items, True): #アイテムの取得処理
+            weapon_dict[item.item_name] += 1
 
         items.update(screen)
         bird.update(key_lst, screen)
