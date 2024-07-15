@@ -408,7 +408,7 @@ class SatelliteWeapon(Weapon):
     """
     こうかとんの周りを周回する衛星に関するクラス
     """
-    def __init__(self, bird: Bird, radius: int = 200, angle : int = 0, angular_speed: float = 0.1):
+    def __init__(self, bird: Bird, radius: int = 200, angle : int = 0, angular_speed: float = 0.05):
         """
         武器画像Surfaceを生成する
         引数1 bird：武器を発射するこうかとん
@@ -417,11 +417,13 @@ class SatelliteWeapon(Weapon):
         引数4 周回速度
         """
         super().__init__(bird)
+        img = pg.image.load(f"fig/satellite_shield.png")
         self.radius = radius
         self.angle = math.radians(angle)
-        self.image = pg.Surface((20, 20))
-        self.image.set_colorkey((0, 0, 0))
-        pg.draw.circle(self.image, (0, 0, 255), (10, 10), 10)
+        # self.image = pg.Surface((20, 20))
+        # self.image.set_colorkey((0, 0, 0))
+        # pg.draw.circle(self.image, (0, 0, 255), (10, 10), 10)
+        self.image = pg.transform.rotozoom(img, 0, 0.05)
         self.angular_speed = angular_speed
         self.rect = self.image.get_rect()
 
@@ -438,7 +440,7 @@ class SatelliteWeapon(Weapon):
 
 class ShootingSatelliteWeapon(SatelliteWeapon):
     bullets = pg.sprite.Group()
-    def __init__(self, bird: Bird, radius: int = 200, angle: int = 0, angular_speed: float = 0.1, shoot_cooldown: int = 50):
+    def __init__(self, bird: Bird, radius: int = 200, angle: int = 0, angular_speed: float = 0.05, shoot_cooldown: int = 50):
         super().__init__(bird, radius, angle, angular_speed)
         self.shoot_cooldown = shoot_cooldown  # 発射間隔（フレーム数）
         self.shoot_timer = 0
@@ -507,9 +509,11 @@ class BoomerangWeapon(Weapon):
         引数4 ブーメランの回転速度
         """
         super().__init__(bird, speed)
-        self.original_image = pg.Surface((50, 50))
-        self.original_image.set_colorkey((0, 0, 0))
-        pg.draw.circle(self.original_image, (255, 0, 0), (25, 25), 25)
+        img = pg.image.load(f"fig/boomerang.png")
+        # self.original_image = pg.Surface((50, 50))
+        # self.original_image.set_colorkey((0, 0, 0))
+        # pg.draw.circle(self.original_image, (255, 0, 0), (25, 25), 25)
+        self.original_image = pg.transform.rotozoom(img, 0, 0.05)
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rect.center = bird.rect.center
@@ -594,9 +598,9 @@ def main():
     tmr = 0
     num_barriers = 3
     angle = 360 / num_barriers
-    weapon_cooldown ={"bullet":70, "satellite":30, "slash":20, "boomerang":20}  # 30フレーム（約0.6秒）ごとに発射
-    weapon_timer = {"bullet":0, "satellite":0, "slash":0, "boomerang":0}
-    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
+    weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
+    weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
+    weapon_dict = {"weapon_mode":0, "satellite":1, "slash":0, "boomerang":1}
     clock = pg.time.Clock()
     count = 0
     while True:
@@ -714,7 +718,7 @@ def main():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
         elif weapon_dict["satellite"] == 2:
-            for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
+            for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
                 exps.add(Explosion(emy, 100))
                 score.value += 10
                 bird.change_img(6, screen)
