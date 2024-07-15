@@ -363,6 +363,9 @@ class NormalWeapon(Weapon):
     """
     通常弾に関するクラス
     """
+    img = pg.image.load(f"fig/beam.png")
+    small_image = pg.transform.scale(img, (img.get_width() // 2, img.get_height() // 2))
+    image = pg.transform.rotozoom(small_image, 90, 1)
     def __init__(self, bird: Bird, beam_x: int = 0, speed: int = 10):
         """
         武器画像Surfaceを生成する
@@ -371,10 +374,7 @@ class NormalWeapon(Weapon):
         引数3 ビームのスピード
         """
         super().__init__(bird, speed)
-        img = pg.image.load(f"fig/beam.png")
-        small_image = pg.transform.scale(img, (img.get_width() // 2, img.get_height() // 2))
-        self.image = pg.transform.rotozoom(small_image, 90, 1)
-        self.rect = self.image.get_rect()
+        self.rect = __class__.image.get_rect()
         self.rect.centerx = bird.rect.centerx + beam_x
         self.rect.bottom = bird.rect.top
         self.vx = 0
@@ -408,6 +408,8 @@ class SatelliteWeapon(Weapon):
     """
     こうかとんの周りを周回する衛星に関するクラス
     """
+    img = pg.image.load(f"fig/satellite_shield.png")
+    image = pg.transform.rotozoom(img, 0, 0.05)
     def __init__(self, bird: Bird, radius: int = 200, angle : int = 0, angular_speed: float = 0.05):
         """
         武器画像Surfaceを生成する
@@ -417,15 +419,10 @@ class SatelliteWeapon(Weapon):
         引数4 周回速度
         """
         super().__init__(bird)
-        img = pg.image.load(f"fig/satellite_shield.png")
         self.radius = radius
-        self.angle = math.radians(angle)
-        # self.image = pg.Surface((20, 20))
-        # self.image.set_colorkey((0, 0, 0))
-        # pg.draw.circle(self.image, (0, 0, 255), (10, 10), 10)
-        self.image = pg.transform.rotozoom(img, 0, 0.05)
+        self.angle = math.radians(angle)       
         self.angular_speed = angular_speed
-        self.rect = self.image.get_rect()
+        self.rect = __class__.image.get_rect()
 
     def update(self):
         """
@@ -468,6 +465,8 @@ class SlashWeapon(Weapon):
     """
     斬撃に関するクラス
     """
+    img = pg.image.load(f"fig/slash_effect.png")
+    image = pg.transform.flip(img, True, False)
     def __init__(self, bird: Bird, hp: int = 10):
         """
         武器画像Surfaceを生成する
@@ -477,16 +476,13 @@ class SlashWeapon(Weapon):
         super().__init__(bird)
         self.vx, self.vy = bird.dire
         angle = math.degrees(math.atan2(-self.vy, self.vx))
-        img = pg.image.load(f"fig/slash_effect.png")
-        small_image = pg.transform.scale(img, (img.get_width() // 10, img.get_height() // 25))
-        small_image = pg.transform.flip(small_image, True, False)
-        self.image = pg.transform.rotozoom(small_image, angle, 2.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
+        self.image = pg.transform.rotozoom(__class__.image, angle, 0.1)
         self.rect = self.image.get_rect()
         self.rect.centery = bird.rect.centery+bird.rect.height*self.vy
-        self.ret.centerx = bird.rect.centerx+bird.rect.width*self.vx
-        self.hp =hp
+        self.rect.centerx = bird.rect.centerx+bird.rect.width*self.vx
+        self.hp = hp
     
     def update(self):
         """
@@ -500,6 +496,8 @@ class BoomerangWeapon(Weapon):
     """
     ブーメランに関するクラス
     """
+    img = pg.image.load(f"fig/boomerang.png")
+    original_image = pg.transform.rotozoom(img, 0, 0.05)
     def __init__(self, bird: Bird, speed: int = 5, max_distance: int = 300, rotation_speed: int = 10):
         """
         武器画像Surfaceを生成する
@@ -509,12 +507,7 @@ class BoomerangWeapon(Weapon):
         引数4 ブーメランの回転速度
         """
         super().__init__(bird, speed)
-        img = pg.image.load(f"fig/boomerang.png")
-        # self.original_image = pg.Surface((50, 50))
-        # self.original_image.set_colorkey((0, 0, 0))
-        # pg.draw.circle(self.original_image, (255, 0, 0), (25, 25), 25)
-        self.original_image = pg.transform.rotozoom(img, 0, 0.05)
-        self.image = self.original_image
+        self.image = __class__.original_image
         self.rect = self.image.get_rect()
         self.rect.center = bird.rect.center
         self.max_distance = max_distance
@@ -600,7 +593,7 @@ def main():
     angle = 360 / num_barriers
     weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
     weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":0, "satellite":1, "slash":0, "boomerang":1}
+    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
     clock = pg.time.Clock()
     count = 0
     while True:
