@@ -126,8 +126,8 @@ class Bomb(pg.sprite.Sprite):
     爆弾に関するクラス
     """
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
-    bossbeam_image=pg.transform.rotozoom(pg.image.load(f"fig/beam2.png"), 0, 0.03)
-    bossscull_image = pg.transform.rotozoom(pg.image.load(f"fig/bone.png"), 0, 0.03)
+    bossbeam_image=pg.transform.rotozoom(pg.image.load(f"fig/beam2.png"), 0, 0.03)  # ボスの攻撃の弾画像読み込み
+    bossscull_image = pg.transform.rotozoom(pg.image.load(f"fig/bone.png"), 0, 0.03)  # ボスの攻撃の弾の画像読み込み
 
     def __init__(self, emy: "Enemy", bird: Bird, mode=0):
         """
@@ -138,8 +138,8 @@ class Bomb(pg.sprite.Sprite):
         super().__init__()
         self.mode = mode
         if self.mode==2:
-            self.hit = "nohit"
-            self.image=__class__.bossscull_image
+            self.hit = "nohit"  # ボムとビームの当たり判定なし
+            self.image=__class__.bossscull_image  
         else:
             self.hit = "hit"
             if self.mode == 0:
@@ -378,7 +378,7 @@ class Boss(pg.sprite.Sprite):
     img = pg.transform.rotozoom(pg.image.load(f"fig/bosstoka.png"), 0, 2.0)
     img2 = pg.transform.rotozoom(pg.image.load(f"fig/boss2.png"), 0, 2.0)
 
-    def __init__(self, hp):
+    def __init__(self, hp: int):
         super().__init__()
         self.image = __class__.img
         self.rect = self.image.get_rect() 
@@ -386,27 +386,29 @@ class Boss(pg.sprite.Sprite):
         self.vx, self.vy = 0, +6
         self.bound = 100  # 停止位置
         self.state = "down"  # 降下状態or停止状態 
-        self.interval = 50  # 爆弾投下初期インターバル
+        self.interval = 30  # 爆弾投下初期インターバル
         self.interval2 = 50  # ビーム当てても消えない爆弾投下インターバル
         self.hp = hp  # ボスのHPを5に設定
         self.boss_mode = "yowayowa"   
         
-    def update(self, hp):
+    def update(self, hp: int):
         # ボスの動き（例えば左右に移動）
-        self.vx=0
         self.vx += 5 if random.choice([True, False]) else -5
         self.rect.move_ip(self.vx, self.vy)
         # 画面の端を超えないように
-        if self.boss_mode == "yowayowa":
+        if self.boss_mode == "yowayowa":  # ボスの第一段階動き範囲指定
             if self.rect.left < 0:
                 self.rect.left = 0
+                self.vx = 10
             if self.rect.right > WIDTH:
                 self.rect.right = WIDTH
+                self.vx = -10
             if self.rect.centery > self.bound:
                 self.vy = 0
                 self.state = "stop"
-        else:
-            self.vy += 5 if random.choice([True, False]) else -5
+        else:  # ボスの第二、三段階動き範囲指定、速度指定兼制限
+            self.vy += 5 if random.choice([True, False]) else -5  # 速度をランダムで増減させる
+            # 画面外出ないようにする
             if self.rect.left < 0:
                 self.vx = 10
                 self.rect.left = 0
@@ -419,6 +421,7 @@ class Boss(pg.sprite.Sprite):
             if self.rect.bottom> HEIGHT//4:
                 self.rect.bottom = HEIGHT//4
                 self.vy = -10
+            # 速度制限
             if self.vx > 30:
                 self.vx = 30
             if self.vx < -30:
@@ -429,15 +432,15 @@ class Boss(pg.sprite.Sprite):
                 self.vy = -30
         
         if self.hp <= hp//2:
-            if self.hp <= 3:
-                self.boss_mode = "tuyotuyotuyo"
+            if self.hp <= hp//4:
+                self.boss_mode = "tuyotuyotuyo"  # ボスの行動パターン変える
                 self.interval = 1
-                self.image = __class__.img2
+                self.image = __class__.img2  # ボスの画像を変える
             else:
-                self.boss_mode = "tuyotuyo"
+                self.boss_mode = "tuyotuyo"  # ボスの行動パターンを変える
                 self.interval = 15
             
-        if self.hp <= 0:
+        if self.hp <= 0:  # ボスHPなくなったらキル
             self.kill()
  
 
@@ -479,10 +482,10 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value > 200:
                 gvys.add(Gravity(400))
                 score.value -= 200
-            if event.type == pg.KEYDOWN and event.key == pg.K_o and boss_count == 0:
+            if event.type == pg.KEYDOWN and event.key == pg.K_o and boss_count == 0: #  boss召喚(仮)
                 bosses.add(Boss(bosshp))
                 boss_count += 1
-        beams.add(Beam(bird))
+
         # 課題4main
         if event.type == pg.KEYDOWN and key_lst[pg.K_RSHIFT] == True and score.value >= 100:
             bird.state = "hyper"
@@ -500,14 +503,14 @@ def main():
 
         for boss in bosses:
             if tmr%boss.interval == 0:
+                # intervalに応じて爆弾投下
                 if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                    bombs.add(Bomb(boss, bird, 1))
+                    bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
                 else:
-                    bombs.add(Bomb(boss, bird, 3))
+                    bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
             if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
                 if tmr%boss.interval2 == 0:
-                    bombs2.add(Bomb(boss, bird, 2))
+                    bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
@@ -518,7 +521,7 @@ def main():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
 
-        for bomb in pg.sprite.groupcollide(bombs2, beams, False, True).keys():
+        for bomb in pg.sprite.groupcollide(bombs2, beams, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
             pass
         
         for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
@@ -533,7 +536,7 @@ def main():
             score.value += 1
 
         for boss in pg.sprite.groupcollide(bosses, beams, False, True).keys():
-            boss.hp -= 1
+            boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
 
         if bird.state == "hyper":
             for bomb in pg.sprite.spritecollide(bird, bombs, True):
@@ -548,7 +551,7 @@ def main():
                 time.sleep(2)
                 return
 
-        if bosses.sprites() == [] and boss_count == 1:
+        if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
             img2 = pg.transform.rotozoom(pg.image.load(f"fig/explosion.png"), 0, 5.0)
             rect2 = img2.get_rect()
             rect2.center = WIDTH//2, HEIGHT//2
