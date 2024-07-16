@@ -55,7 +55,7 @@ class Bird(pg.sprite.Sprite):
         引数2 xy：こうかとん画像の位置座標タプル
         """
         super().__init__()
-        img0 = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 2.0)
+        img0 = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.2)
         img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん
         self.imgs = {
             (+1, 0): img,  # 右
@@ -125,34 +125,62 @@ class Bomb(pg.sprite.Sprite):
     爆弾に関するクラス
     """
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+    bossbeam_image=pg.transform.rotozoom(pg.image.load(f"fig/beam2.png"), 0, 0.03)  # ボスの攻撃の弾画像読み込み
+    bossscull_image = pg.transform.rotozoom(pg.image.load(f"fig/bone.png"), 0, 0.03)  # ボスの攻撃の弾の画像読み込み
 
-    def __init__(self, emy: "Enemy", bird: Bird):
+    def __init__(self, emy: "Enemy", bird: Bird, mode=0):
         """
         爆弾円Surfaceを生成する
         引数1 emy：爆弾を投下する敵機
         引数2 bird：攻撃対象のこうかとん
         """
         super().__init__()
-        rad = random.randint(10, 50)  # 爆弾円の半径：10以上50以下の乱数
-        self.image = pg.Surface((2*rad, 2*rad))
-        color = random.choice(__class__.colors)  # 爆弾円の色：クラス変数からランダム選択
-        pg.draw.circle(self.image, color, (rad, rad), rad)
-        self.image.set_colorkey((0, 0, 0))
+        self.mode = mode
+        if self.mode==2:
+            self.hit = "nohit"  # ボムとビームの当たり判定なし
+            self.image=__class__.bossscull_image  
+        else:
+            self.hit = "hit"
+            if self.mode == 0:
+                rad = random.randint(10, 50)  # 爆弾円の半径：10以上50以下の乱数
+            
+                self.image = pg.Surface((2*rad, 2*rad))
+                color = random.choice(__class__.colors)  # 爆弾円の色：クラス変数からランダム選択
+                pg.draw.circle(self.image, color, (rad, rad), rad)
+                self.image.set_colorkey((0, 0, 0))
+            else:
+                self.image = __class__.bossbeam_image
+            
+        vlst = [(0, 1), (1, 1), (1, 0), (-1, 0), (-1, 1)]
+        
         self.rect = self.image.get_rect()
         # 爆弾を投下するemyから見た攻撃対象のbirdの方向を計算
-        self.vx, self.vy = calc_orientation(emy.rect, bird.rect)  
+        self.vx, self.vy = calc_orientation(emy.rect, bird.rect)
+        if self.mode == 3:
+            self.vx, self.vy =  random.choice(vlst)
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
         self.speed = 6
         self.state = "active"
+        self.count = 0
+        
+        
 
     def update(self):
         """
         爆弾を速度ベクトルself.vx, self.vyに基づき移動させる
         引数 screen：画面Surface
         """
+        if self.mode != 0:
+            if self.rect.left < 0:
+                self.vx *= -1
+                self.rect.left = 0
+            if self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+                self.vx *= -1
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
-        if check_bound(self.rect) != (True, True):
+        self.count += 1
+        if check_bound(self.rect) != (True, True) and check_bound(self.rect) != (False, True) or self.count >= 300:
             self.kill()
 
 
@@ -341,6 +369,77 @@ class Shield(pg.sprite.Sprite):
     def update(self):
         self.life -= 1
         if self.life < 0:
+            self.kill()
+
+
+ #ボスクラス
+class Boss(pg.sprite.Sprite):
+    img = pg.transform.rotozoom(pg.image.load(f"fig/bosstoka.png"), 0, 2.0)
+    img2 = pg.transform.rotozoom(pg.image.load(f"fig/boss2.png"), 0, 2.0)
+
+    def __init__(self, hp: int):
+        super().__init__()
+        self.image = __class__.img
+        self.rect = self.image.get_rect() 
+        self.rect.center = WIDTH//2, 0
+        self.vx, self.vy = 0, +6
+        self.bound = 100  # 停止位置
+        self.state = "down"  # 降下状態or停止状態 
+        self.interval = 30  # 爆弾投下初期インターバル
+        self.interval2 = 50  # ビーム当てても消えない爆弾投下インターバル
+        self.hp = hp  # ボスのHPを5に設定
+        self.boss_mode = "yowayowa"   
+        
+    def update(self, hp: int):
+        # ボスの動き（例えば左右に移動）
+        self.vx += 5 if random.choice([True, False]) else -5
+        self.rect.move_ip(self.vx, self.vy)
+        # 画面の端を超えないように
+        if self.boss_mode == "yowayowa":  # ボスの第一段階動き範囲指定
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.vx = 10
+            if self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+                self.vx = -10
+            if self.rect.centery > self.bound:
+                self.vy = 0
+                self.state = "stop"
+        else:  # ボスの第二、三段階動き範囲指定、速度指定兼制限
+            self.vy += 5 if random.choice([True, False]) else -5  # 速度をランダムで増減させる
+            # 画面外出ないようにする
+            if self.rect.left < 0:
+                self.vx = 10
+                self.rect.left = 0
+            if self.rect.right > WIDTH:
+                self.rect.right = WIDTH
+                self.vx = -10
+            if self.rect.top < 0:
+                self.rect.top = 0
+                self.vy = 10
+            if self.rect.bottom> HEIGHT//4:
+                self.rect.bottom = HEIGHT//4
+                self.vy = -10
+            # 速度制限
+            if self.vx > 30:
+                self.vx = 30
+            if self.vx < -30:
+                self.vx = -30
+            if self.vy > 30:
+                self.vy = 30
+            if self.vy < -30:
+                self.vy = -30
+        
+        if self.hp <= hp//2:
+            if self.hp <= hp//4:
+                self.boss_mode = "tuyotuyotuyo"  # ボスの行動パターン変える
+                self.interval = 1
+                self.image = __class__.img2  # ボスの画像を変える
+            else:
+                self.boss_mode = "tuyotuyo"  # ボスの行動パターンを変える
+                self.interval = 15
+            
+        if self.hp <= 0:  # ボスHPなくなったらキル
             self.kill()
 
 class Weapon(pg.sprite.Sprite): 
@@ -574,6 +673,7 @@ class GetItem(pg.sprite.Sprite):
 
 
 def main():
+    bosshp = 100
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
@@ -581,21 +681,26 @@ def main():
 
     bird = Bird(3, (WIDTH//2, HEIGHT-100))
     bombs = pg.sprite.Group()
+    bombs2 = pg.sprite.Group()
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     shields = pg.sprite.Group()
     gvys = pg.sprite.Group()
     weapons = pg.sprite.Group()
-    items = pg.sprite.Group()
+    items = pg.sprite.Group()    
+    bosses = pg.sprite.Group()
+    
+
     tmr = 0
     num_barriers = 3
     angle = 360 / num_barriers
     weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
     weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":0, "satellite":2, "slash":1, "boomerang":1}
+    weapon_dict = {"weapon_mode":2, "satellite":0, "slash":1, "boomerang":0}
     clock = pg.time.Clock()
     count = 0
+    boss_count = 0
     while True:
         key_lst = pg.key.get_pressed()
         for event in pg.event.get():
@@ -613,6 +718,9 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN and score.value > 200:
                 gvys.add(Gravity(400))
                 score.value -= 200
+            if event.type == pg.KEYDOWN and event.key == pg.K_o and boss_count == 0: #  boss召喚(仮)
+                bosses.add(Boss(bosshp))
+                boss_count += 1
         """ここはテストプログラム"""
         if count == 0:
             count += 1
@@ -664,7 +772,9 @@ def main():
             if weapon_dict["boomerang"] == 1:
                 weapons.add(BoomerangWeapon(bird))
             weapon_timer["boomerang"] = 0
-        # ブーメラン
+        # ブーメラン            
+        
+
         # 課題4main
         if event.type == pg.KEYDOWN and key_lst[pg.K_RSHIFT] == True and score.value >= 100:
             bird.state = "hyper"
@@ -672,25 +782,43 @@ def main():
             score.value -= 100
         screen.blit(bg_img, [0, 0])
 
-
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
-            emys.add(Enemy())
+        # if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+        #     emys.add(Enemy())
 
         for emy in emys:
             if emy.state == "stop" and tmr%emy.interval == 0:
                 # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
 
+        for boss in bosses:
+            if tmr%boss.interval == 0:
+                # intervalに応じて爆弾投下
+                if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
+                    bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
+                else:
+                    bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
+            if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
+                if tmr%boss.interval2 == 0:
+                    bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
+        # for bomb in pg.sprite.groupcollide(bombs, weapons, True, True).keys():
+        #         exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+        #         score.value += 1  # 1点アップ
+
         """武器の衝突処理"""
         if weapon_dict["weapon_mode"] == 0:
             """weaponmodeがnormal(ノーマル)のときの衝突処理"""
+            
             for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
-                exps.add(Explosion(emy, 100))  # 爆発エフェクト
-                score.value += 10  # 10点アップ
-                bird.change_img(6, screen)  # こうかとん喜びエフェクト
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, True).keys():
+                    exps.add(Explosion(emy, 100))  # 爆発エフェクト
+                    score.value += 10  # 10点アップ
+                    bird.change_img(6, screen)  # こうかとん喜びエフェクト
+            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))  # 爆発エフェクト
                 score.value += 1  # 1点アップ
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, True).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
         
         elif weapon_dict["weapon_mode"] == 1:
             """weaponmodeがpanet(貫通モード)のときの衝突処理"""
@@ -701,6 +829,10 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))  # 爆発エフェクト
                 score.value += 1  # 1点アップ
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
 
         if weapon_dict["satellite"] == 1:
             for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
@@ -710,6 +842,11 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for bomb in pg.sprite.groupcollide(bombs2, weapons, True, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
+
         elif weapon_dict["satellite"] == 2:
             for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
                 exps.add(Explosion(emy, 100))
@@ -725,6 +862,14 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, ShootingSatelliteWeapon.bullets, True, True).keys():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for boss in pg.sprite.groupcollide(bosses, ShootingSatelliteWeapon.bullets, False, True).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
+            for bomb in pg.sprite.groupcollide(bombs2, ShootingSatelliteWeapon.bullets, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
 
         if weapon_dict["slash"] == 1:
             for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
@@ -734,6 +879,10 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            # for bomb in pg.sprite.groupcollide(bombs2, weapons, False, False).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+            #     pass
 
         if weapon_dict["boomerang"] == 1:
             for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
@@ -743,6 +892,10 @@ def main():
             for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
+            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                pass
         """追加武器の衝突処理終了"""
         for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
             exps.add(Explosion(bomb, 50))
@@ -761,13 +914,28 @@ def main():
                 score.value += 1  # 1点アップ
         
         else:
-            if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
+            if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
                 bird.change_img(8, screen) # こうかとん悲しみエフェクト
                 score.update(screen)
                 pg.display.update()
                 time.sleep(2)
                 return
-        
+
+        if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
+            img2 = pg.transform.rotozoom(pg.image.load(f"fig/explosion.png"), 0, 5.0)
+            rect2 = img2.get_rect()
+            rect2.center = WIDTH//2, HEIGHT//2
+            screen.blit(img2, rect2)
+            font = pg.font.Font(None, 50)
+            color = (0, 0, 0)
+            img = font.render(f"GAME CLEAR", 0, color)
+            rect = img.get_rect()
+            rect.center = WIDTH//2, HEIGHT//2
+            screen.blit(img, rect)
+            
+            pg.display.update()
+            time.sleep(5)
+            return
         for item in pg.sprite.spritecollide(bird, items, True): #アイテムの取得処理
             weapon_dict[item.item_name] += 1
 
@@ -785,6 +953,8 @@ def main():
         emys.draw(screen)
         bombs.update()
         bombs.draw(screen)
+        bombs2.update()
+        bombs2.draw(screen)
         exps.update()
         exps.draw(screen)
         score.update(screen)
@@ -793,10 +963,11 @@ def main():
         shields.draw(screen)
         shields.update()
         weapons.update()
+        bosses.draw(screen)
+        bosses.update(bosshp)
         pg.display.update()
         tmr += 1
         clock.tick(50)
-        
 
 
 if __name__ == "__main__":
