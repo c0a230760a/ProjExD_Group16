@@ -593,7 +593,7 @@ def main():
     angle = 360 / num_barriers
     weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
     weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
+    weapon_dict = {"weapon_mode":0, "satellite":2, "slash":1, "boomerang":1}
     clock = pg.time.Clock()
     count = 0
     while True:
