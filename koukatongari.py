@@ -345,7 +345,7 @@ class Round:
         self.is_transitioning = True
         self.required_scores = [0, 50, 70, 80, 100]  # 各ラウンドに必要なスコア
 
-    def update(self, screen, score):
+    def update(self, screen, score, items):
         if self.is_transitioning:
             if self.transition_time > 60:  # 最初の1秒間は黒画面にテキスト表示
                 self.transition_time -= 1
@@ -369,11 +369,21 @@ class Round:
 
         # スコアに基づいてラウンドを更新
         if self.current_round < 4 and score.value >= self.required_scores[self.current_round + 1]:
-            self.next_round()
+            self.next_round(items)
 
-    def next_round(self):
+    def next_round(self, items):
         global gameround
         if self.current_round < 4:
+            if self.current_round == 0:
+                items.add(GetItem("fig/boomerang.png", downsize=100, angle=0, xy=(WIDTH/4, 100), item_name="boomerang"))
+                items.add(GetItem("fig/slash_effect.png", downsize=100, angle=0, xy=(WIDTH-WIDTH/4, 100), item_name="slash"))
+            elif self.current_round == 1:
+                items.add(GetItem("fig/satellite_shield.png", downsize=100, angle=0, xy=(WIDTH/2, 100), item_name="satellite"))
+            elif self.current_round == 2:
+                 items.add(GetItem("fig/shootingsatellite.png", downsize=100, angle=0, xy=(WIDTH-WIDTH/4, 100), item_name="satellite"))
+                 items.add(GetItem("fig/penet_bullet.png", downsize=100, angle=90, xy=(WIDTH/4, 100), item_name="weapon_mode"))
+            elif self.current_round == 3:
+                items.add(GetItem("fig/weapon_up.png", downsize=100, angle=0, xy=(WIDTH/2, 100), item_name="rate_up"))
             gameround += 1
             self.current_round += 1
             self.is_transitioning = True
@@ -563,6 +573,8 @@ class SatelliteWeapon(Weapon):
 
 class ShootingSatelliteWeapon(SatelliteWeapon):
     bullets = pg.sprite.Group()
+    img = pg.image.load(f"fig/shootingsatellite.png")
+    image = pg.transform.rotozoom(img, 0, 0.5)
     def __init__(self, bird: Bird, radius: int = 200, angle: int = 0, angular_speed: float = 0.05, shoot_cooldown: int = 50):
         super().__init__(bird, radius, angle, angular_speed)
         self.shoot_cooldown = shoot_cooldown  # 発射間隔（フレーム数）
@@ -685,12 +697,37 @@ class GetItem(pg.sprite.Sprite):
         """
         super().__init__()
         img = pg.image.load(img_name)
-        small_image = pg.transform.scale(img, (img.get_width() // downsize, img.get_height() // downsize))
+        small_image = self.scale_image(img, downsize)
         self.small_image = pg.transform.rotozoom(small_image, angle, 1)
         self.rect = self.small_image.get_rect()
         self.rect.center = xy
         self.item_name = item_name
-    
+
+    def scale_image(self, image: pg.Surface, size: int):
+        """
+        アスペクト比を保ちながら画像を指定サイズの正方形内に収める
+        """
+        width, height = image.get_size()
+        aspect_ratio = width / height
+        
+        if aspect_ratio > 1:  # 横長の画像
+            new_width = size
+            new_height = int(size / aspect_ratio)
+        else:  # 縦長または正方形の画像
+            new_height = size
+            new_width = int(size * aspect_ratio)
+        
+        scaled_image = pg.transform.smoothscale(image, (new_width, new_height))
+        
+        # 正方形の背景を作成
+        square_surface = pg.Surface((size, size), pg.SRCALPHA)
+        
+        # 縮小した画像を正方形の中央に配置
+        x = (size - new_width) // 2
+        y = (size - new_height) // 2
+        square_surface.blit(scaled_image, (x, y))
+        
+        return square_surface
     def update(self, screen: pg.Surface):
         """
         画像の描画
@@ -724,9 +761,9 @@ def main():
     tmr = 0
     num_barriers = 3
     angle = 360 / num_barriers
-    weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":0, "satellite":1, "slash":1, "boomerang":1}
+    weapon_cooldown ={"bullet":14, "satellite":70, "slash":20, "boomerang":20}
+    weapon_timer = {"bullet":14, "satellite":70, "slash":20, "boomerang":20}
+    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
     clock = pg.time.Clock()
 
     show_title_screen(screen)
@@ -757,12 +794,6 @@ def main():
                     pg.display.update()
                     time.sleep(2)
                     return
-        """ここはテストプログラム"""
-        if count == 0:
-            count += 1
-            item_img = f"fig/beam.png"
-            items.add(GetItem(item_img, downsize=2, angle=90, xy=(100, 100), item_name="weapon_mode"))
-        """ここまでテストプログラム"""
         """武器の発射処理"""
         for i in weapon_cooldown:
             weapon_timer[i] += 1
@@ -817,44 +848,45 @@ def main():
             screen.fill((0, 0, 0))  # 黒い背景を描画
         else:
             screen.blit(bg_img, [0, 0])  # 通常の背景を描画
-        round_manager.update(screen, score)
+        round_manager.update(screen, score, items)
 
         if not round_manager.is_transitioning:
-            if gameround == 0:
-                if tmr%250 == 0:  # 200フレーム，敵機を出現させる
-                    for _ in range(1):
-                        emys.add(Enemy())
-            elif gameround == 1:
-                if tmr%200 == 0:  # 200フレーム，敵機を出現させる
-                    for _ in range(2):  # 敵機の数
-                        emys.add(Enemy())
-            elif gameround == 2:
-                if tmr%170 == 0:  # 200フレーム，敵機を出現させる
-                    for _ in range(4):  # 敵機の数
-                        emys.add(Enemy())
-            elif gameround == 3:
-                if tmr%80 == 0:  # 200フレーム，敵機を出現させる
-                    for _ in range(5):  # 敵機の数
-                        emys.add(Enemy())
-            elif gameround == 4:
-                if boss_count == 0:
-                    bosses.add(Boss(bosshp))
-                    boss_count += 1
-            for emy in emys:
-                if tmr%emy.interval == 0:
-                    # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                    bombs.add(Bomb(emy, bird))
+            if len(items) == 0:
+                if gameround == 0:
+                    if tmr%250 == 0:  # 200フレーム，敵機を出現させる
+                        for _ in range(1):
+                            emys.add(Enemy())
+                elif gameround == 1:
+                    if tmr%200 == 0:  # 200フレーム，敵機を出現させる
+                        for _ in range(2):  # 敵機の数
+                            emys.add(Enemy())
+                elif gameround == 2:
+                    if tmr%170 == 0:  # 200フレーム，敵機を出現させる
+                        for _ in range(4):  # 敵機の数
+                            emys.add(Enemy())
+                elif gameround == 3:
+                    if tmr%80 == 0:  # 200フレーム，敵機を出現させる
+                        for _ in range(5):  # 敵機の数
+                            emys.add(Enemy())
+                elif gameround == 4:
+                    if boss_count == 0:
+                        bosses.add(Boss(bosshp))
+                        boss_count += 1
+                for emy in emys:
+                    if tmr%emy.interval == 0:
+                        # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+                        bombs.add(Bomb(emy, bird))
 
-            for boss in bosses:
-                if tmr%boss.interval == 0:
-                # intervalに応じて爆弾投下
-                    if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
-                        bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
-                    else:
-                        bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
-                if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
-                    if tmr%boss.interval2 == 0:
-                        bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
+                for boss in bosses:
+                    if tmr%boss.interval == 0:
+                    # intervalに応じて爆弾投下
+                        if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
+                            bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
+                        else:
+                            bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
+                    if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
+                        if tmr%boss.interval2 == 0:
+                            bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
 
             """武器の衝突処理"""
             if weapon_dict["weapon_mode"] == 0:
@@ -989,8 +1021,15 @@ def main():
                 time.sleep(5)
                 return
             for item in pg.sprite.spritecollide(bird, items, True): #アイテムの取得処理
-                weapon_dict[item.item_name] += 1
-
+                if item.item_name == "rate_up":
+                        weapon_cooldown["bullet"] = 7
+                        weapon_timer["bullet"] = 7
+                else:
+                    weapon_dict[item.item_name] += 1
+                items.empty()
+        else:
+            emys.empty()
+            bombs.empty()
         items.update(screen)
         exps.update()
         exps.draw(screen)
