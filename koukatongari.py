@@ -12,7 +12,7 @@ HEIGHT = 720  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #global変数の追加
-gameround = 3
+gameround = 0
 
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
