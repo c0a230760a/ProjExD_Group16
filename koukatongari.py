@@ -432,7 +432,7 @@ class Boss(pg.sprite.Sprite):
                 self.vy = -30
         
         if self.hp <= hp//2:
-            if self.hp <= hp//4:
+            if self.hp <= hp:
                 self.boss_mode = "tuyotuyotuyo"  # ボスの行動パターン変える
                 self.interval = 1
                 self.image = __class__.img2  # ボスの画像を変える
