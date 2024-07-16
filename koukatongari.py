@@ -12,7 +12,7 @@ HEIGHT = 720  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 #global変数の追加
-gameround = 3
+gameround = 0
 
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
@@ -187,6 +187,8 @@ class Bomb(pg.sprite.Sprite):
             self.speed = 12
         elif gameround == 3:
             self.speed = 18
+        else:
+            self.speed = 10
         self.state = "active"
         self.count = 0
         
@@ -353,7 +355,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 10000
+        self.value = 0
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -426,6 +428,69 @@ class Shield(pg.sprite.Sprite):
         self.life -= 1
         if self.life < 0:
             self.kill()
+
+# 各ラウンドの背景と移動   
+class Round:
+    def __init__(self):
+        self.current_round = 0 # 現在のラウンド番号
+        self.backgrounds = [pg.image.load(f"fig/round{i}.jpg") for i in range(1, 6)]
+        self.bg_pos = -HEIGHT # 背景画像の位置(画面外)
+        self.transition_time = 120 # トランジションの時間
+        self.is_transitioning = True
+        self.required_scores = [0, 50, 150, 300, 500]  # 各ラウンドに必要なスコア
+
+    def update(self, screen, score):
+        if self.is_transitioning:
+            if self.transition_time > 60:  # 最初の1秒間は黒画面にテキスト表示
+                self.transition_time -= 1
+                screen.fill((0, 0, 0)) # 画面を黒で塗りつぶす
+                font = pg.font.Font(None, 64)
+                if self.current_round == 4: # 最終ラウンド
+                    text = font.render("Final Round", True, (255, 255, 255))
+                else: # 1～4ラウンド
+                    text = font.render(f"Round{self.current_round + 1}", True, (255, 255, 255))
+                text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+                screen.blit(text, text_rect)
+            elif self.transition_time > 0:  # 次の1秒間で背景をスライドイン
+                self.transition_time -= 1
+                self.bg_pos += HEIGHT / 60  # 1秒(60フレーム)かけて画面を下に移動
+                screen.blit(self.backgrounds[self.current_round], (0, self.bg_pos))
+            else:
+                self.is_transitioning = False
+                self.bg_pos = 0
+        else:
+            screen.blit(self.backgrounds[self.current_round], (0, 0))
+
+        # スコアに基づいてラウンドを更新
+        if self.current_round < 4 and score.value >= self.required_scores[self.current_round + 1]:
+            self.next_round()
+
+    def next_round(self):
+        global gameround
+        if self.current_round < 4:
+            gameround += 1
+            self.current_round += 1
+            self.is_transitioning = True
+            self.transition_time = 120  # 2秒間のトランジション（1秒テキスト表示 + 1秒背景スライド）
+            self.bg_pos = -HEIGHT  # 背景位置をリセット
+        
+ 
+def show_title_screen(screen):
+    """
+    タイトル画面を表示する関数
+    引数 screen：画面Surface
+    """
+    font = pg.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 50)
+    title = font.render("鳥の悪魔討伐", True, (255, 255, 255))
+    instruction = font.render("Press S to Start", True, (255, 255, 255))
+    
+    screen.fill((0, 0, 0))  # 画面を黒で塗りつぶす
+    title_rect = title.get_rect(center=(WIDTH//2, HEIGHT//2 - 50))
+    instruction_rect = instruction.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+    screen.blit(title, title_rect)
+    screen.blit(instruction, instruction_rect)
+    pg.display.update()
+
 
 
  #ボスクラス
@@ -743,6 +808,8 @@ def main():
     emys = pg.sprite.Group()
     shields = pg.sprite.Group()
     gvys = pg.sprite.Group()
+
+    round_manager = Round()
     weapons = pg.sprite.Group()
     items = pg.sprite.Group()    
     bosses = pg.sprite.Group()
@@ -753,8 +820,18 @@ def main():
     angle = 360 / num_barriers
     weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
     weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":2, "satellite":0, "slash":1, "boomerang":0}
+    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":1, "boomerang":0}
     clock = pg.time.Clock()
+
+    show_title_screen(screen)
+    title_screen = True
+    while title_screen:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return 0
+            if event.type == pg.KEYDOWN and event.key == pg.K_s:
+                title_screen = False
+
     count = 0
     boss_count = 0
     while True:
@@ -848,181 +925,193 @@ def main():
             score.value -= 100
         screen.blit(bg_img, [0, 0])
 
-        if gameround == 0:
-            if tmr%250 == 0:  # 200フレーム，敵機を出現させる
-                for _ in range(1):
-                    emys.add(Enemy())
-        elif gameround == 1:
-            if tmr%200 == 0:  # 200フレーム，敵機を出現させる
-                for _ in range(2):  # 敵機の数
-                    emys.add(Enemy())
-        elif gameround == 2:
-            if tmr%170 == 0:  # 200フレーム，敵機を出現させる
-                for _ in range(4):  # 敵機の数
-                    emys.add(Enemy())
-        elif gameround == 3:
-            if tmr%80 == 0:  # 200フレーム，敵機を出現させる
-                for _ in range(5):  # 敵機の数
-                    emys.add(Enemy())
+        if round_manager.is_transitioning:
+            screen.fill((0, 0, 0))  # 黒い背景を描画
+        else:
+            screen.blit(bg_img, [0, 0])  # 通常の背景を描画
+        round_manager.update(screen, score)
 
-        for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
-                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
-                bombs.add(Bomb(emy, bird))
+        if not round_manager.is_transitioning:
+            if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+                emys.add(Enemy())
+            if gameround == 0:
+                if tmr%250 == 0:  # 200フレーム，敵機を出現させる
+                    for _ in range(1):
+                        emys.add(Enemy())
+            elif gameround == 1:
+                if tmr%200 == 0:  # 200フレーム，敵機を出現させる
+                    for _ in range(2):  # 敵機の数
+                        emys.add(Enemy())
+            elif gameround == 2:
+                if tmr%170 == 0:  # 200フレーム，敵機を出現させる
+                    for _ in range(4):  # 敵機の数
+                        emys.add(Enemy())
+            elif gameround == 3:
+                if tmr%80 == 0:  # 200フレーム，敵機を出現させる
+                    for _ in range(5):  # 敵機の数
+                        emys.add(Enemy())
+            elif gameround == 4:
+                if boss_count == 0:
+                    bosses.add(Boss(bosshp))
+                    boss_count += 1
+            for emy in emys:
+                if emy.state == "stop" and tmr%emy.interval == 0:
+                    # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
+                    bombs.add(Bomb(emy, bird))
 
-        for boss in bosses:
-            if tmr%boss.interval == 0:
+            for boss in bosses:
+                if tmr%boss.interval == 0:
                 # intervalに応じて爆弾投下
-                if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
-                    bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
-                else:
-                    bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
-            if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
-                if tmr%boss.interval2 == 0:
-                    bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
-        # for bomb in pg.sprite.groupcollide(bombs, weapons, True, True).keys():
-        #         exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-        #         score.value += 1  # 1点アップ
+                    if boss.boss_mode == "yowayowa" or boss.boss_mode =="tuyotuyo":
+                        bombs.add(Bomb(boss, bird, 1))  # 自分に向けてボム投下
+                    else:
+                        bombs.add(Bomb(boss, bird, 3))  # ランダム5パターンのうち1つの方向にボムを投下
+                if boss.boss_mode=="tuyotuyo" or boss.boss_mode == "tuyotuyotuyo":
+                    if tmr%boss.interval2 == 0:
+                        bombs2.add(Bomb(boss, bird, 2))  # 消えないボム投下
+            # for bomb in pg.sprite.groupcollide(bombs, weapons, True, True).keys():
+            #         exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            #         score.value += 1  # 1点アップ
 
-        """武器の衝突処理"""
-        if weapon_dict["weapon_mode"] == 0:
-            """weaponmodeがnormal(ノーマル)のときの衝突処理"""
+            """武器の衝突処理"""
+            if weapon_dict["weapon_mode"] == 0:
+                """weaponmodeがnormal(ノーマル)のときの衝突処理"""
+                
+                for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
+                            exps.add(Explosion(emy, 100))  # 爆発エフェクト
+                            score.value += 10  # 10点アップ
+                            bird.change_img(6, screen)  # こうかとん喜びエフェクト
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+                    score.value += 1  # 1点アップ
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, True).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
             
-            for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
+            elif weapon_dict["weapon_mode"] == 1:
+                """weaponmodeがpanet(貫通モード)のときの衝突処理"""
+                for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
                     exps.add(Explosion(emy, 100))  # 爆発エフェクト
                     score.value += 10  # 10点アップ
                     bird.change_img(6, screen)  # こうかとん喜びエフェクト
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-                score.value += 1  # 1点アップ
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, True).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
-        
-        elif weapon_dict["weapon_mode"] == 1:
-            """weaponmodeがpanet(貫通モード)のときの衝突処理"""
-            for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
-                exps.add(Explosion(emy, 100))  # 爆発エフェクト
-                score.value += 10  # 10点アップ
-                bird.change_img(6, screen)  # こうかとん喜びエフェクト
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-                score.value += 1  # 1点アップ
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+                    score.value += 1  # 1点アップ
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
 
-        if weapon_dict["satellite"] == 1:
-            for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
-                exps.add(Explosion(emy, 100))
-                score.value += 10
-                bird.change_img(6, screen)
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))
-                score.value += 1
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for bomb in pg.sprite.groupcollide(bombs2, weapons, True, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
+            if weapon_dict["satellite"] == 1:
+                for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
+                    exps.add(Explosion(emy, 100))
+                    score.value += 10
+                    bird.change_img(6, screen)
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))
+                    score.value += 1
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for bomb in pg.sprite.groupcollide(bombs2, weapons, True, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
 
-        elif weapon_dict["satellite"] == 2:
-            for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
-                exps.add(Explosion(emy, 100))
-                score.value += 10
-                bird.change_img(6, screen)
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))
-                score.value += 1
-            for emy in pg.sprite.groupcollide(emys, ShootingSatelliteWeapon.bullets, True, True).keys():
-                exps.add(Explosion(emy, 100))
-                score.value += 10
-                bird.change_img(6, screen)
-            for bomb in pg.sprite.groupcollide(bombs, ShootingSatelliteWeapon.bullets, True, True).keys():
-                exps.add(Explosion(bomb, 50))
-                score.value += 1
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for boss in pg.sprite.groupcollide(bosses, ShootingSatelliteWeapon.bullets, False, True).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
-            for bomb in pg.sprite.groupcollide(bombs2, ShootingSatelliteWeapon.bullets, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
+            elif weapon_dict["satellite"] == 2:
+                for emy in pg.sprite.groupcollide(emys, weapons, True, True).keys():
+                    exps.add(Explosion(emy, 100))
+                    score.value += 10
+                    bird.change_img(6, screen)
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))
+                    score.value += 1
+                for emy in pg.sprite.groupcollide(emys, ShootingSatelliteWeapon.bullets, True, True).keys():
+                    exps.add(Explosion(emy, 100))
+                    score.value += 10
+                    bird.change_img(6, screen)
+                for bomb in pg.sprite.groupcollide(bombs, ShootingSatelliteWeapon.bullets, True, True).keys():
+                    exps.add(Explosion(bomb, 50))
+                    score.value += 1
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for boss in pg.sprite.groupcollide(bosses, ShootingSatelliteWeapon.bullets, False, True).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
+                for bomb in pg.sprite.groupcollide(bombs2, ShootingSatelliteWeapon.bullets, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
 
-        if weapon_dict["slash"] == 1:
-            for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
-                exps.add(Explosion(emy, 100))
-                score.value += 10
-                bird.change_img(6, screen)
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))
-                score.value += 1
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            # for bomb in pg.sprite.groupcollide(bombs2, weapons, False, False).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-            #     pass
+            if weapon_dict["slash"] == 1:
+                for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
+                    exps.add(Explosion(emy, 100))
+                    score.value += 10
+                    bird.change_img(6, screen)
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))
+                    score.value += 1
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                # for bomb in pg.sprite.groupcollide(bombs2, weapons, False, False).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                #     pass
 
-        if weapon_dict["boomerang"] == 1:
-            for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
-                exps.add(Explosion(emy, 100))
-                score.value += 10
-                bird.change_img(6, screen)
-            for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
-                exps.add(Explosion(bomb, 50))
-                score.value += 1
-            for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
-                boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
-            for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
-                pass
-        """追加武器の衝突処理終了"""
-        for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
-            exps.add(Explosion(bomb, 50))
+            if weapon_dict["boomerang"] == 1:
+                for emy in pg.sprite.groupcollide(emys, weapons, True, False).keys():
+                    exps.add(Explosion(emy, 100))
+                    score.value += 10
+                    bird.change_img(6, screen)
+                for bomb in pg.sprite.groupcollide(bombs, weapons, True, False).keys():
+                    exps.add(Explosion(bomb, 50))
+                    score.value += 1
+                for boss in pg.sprite.groupcollide(bosses, weapons, False, False).keys():
+                    boss.hp -= 1  # ボスに攻撃が当たったらボスのHPを1減らす
+                for bomb in pg.sprite.groupcollide(bombs2, weapons, False, True).keys():  # 消せないボムとビームがぶつかったらビームのみを消す
+                    pass
+                """追加武器の衝突処理終了"""
+                for bomb in pg.sprite.groupcollide(bombs, shields, True, True).keys():
+                    exps.add(Explosion(bomb, 50))
 
-        for emy in pg.sprite.groupcollide(emys, gvys, True, False).keys():
-            gvys.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += 10
+                for emy in pg.sprite.groupcollide(emys, gvys, True, False).keys():
+                    gvys.add(Explosion(emy, 100))  # 爆発エフェクト
+                    score.value += 10
 
-        for bomb in pg.sprite.groupcollide(bombs, gvys, True, False).keys():
-            gvys.add(Explosion(bomb, 50))
-            score.value += 1
+                for bomb in pg.sprite.groupcollide(bombs, gvys, True, False).keys():
+                    gvys.add(Explosion(bomb, 50))
+                    score.value += 1
 
-        if bird.state == "hyper":
-            for bomb in pg.sprite.spritecollide(bird, bombs, True):
-                exps.add(Explosion(bomb, 50))  # 爆発エフェクト
-                score.value += 1  # 1点アップ
-        
-        else:
-            if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
-                bird.hp -= 1
-                
-                
-            if bird.hp <= 0:
-                bird.change_img(8, screen) # こうかとん悲しみエフェクト
-                score.update(screen)
-                pg.display.update()
-                time.sleep(2)
-                return
-
-
-        if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
-            img2 = pg.transform.rotozoom(pg.image.load(f"fig/explosion.png"), 0, 5.0)
-            rect2 = img2.get_rect()
-            rect2.center = WIDTH//2, HEIGHT//2
-            screen.blit(img2, rect2)
-            font = pg.font.Font(None, 50)
-            color = (0, 0, 0)
-            img = font.render(f"GAME CLEAR", 0, color)
-            rect = img.get_rect()
-            rect.center = WIDTH//2, HEIGHT//2
-            screen.blit(img, rect)
+            if bird.state == "hyper":
+                for bomb in pg.sprite.spritecollide(bird, bombs, True):
+                    exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+                    score.value += 1  # 1点アップ
             
-            pg.display.update()
-            time.sleep(5)
-            return
-        for item in pg.sprite.spritecollide(bird, items, True): #アイテムの取得処理
-            weapon_dict[item.item_name] += 1
+            else:
+                if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
+                    bird.hp -= 1
+                    
+                    
+                if bird.hp <= 0:
+                    bird.change_img(8, screen) # こうかとん悲しみエフェクト
+                    score.update(screen)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
+
+
+            if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
+                img2 = pg.transform.rotozoom(pg.image.load(f"fig/explosion.png"), 0, 5.0)
+                rect2 = img2.get_rect()
+                rect2.center = WIDTH//2, HEIGHT//2
+                screen.blit(img2, rect2)
+                font = pg.font.Font(None, 50)
+                color = (0, 0, 0)
+                img = font.render(f"GAME CLEAR", 0, color)
+                rect = img.get_rect()
+                rect.center = WIDTH//2, HEIGHT//2
+                screen.blit(img, rect)
+                
+                pg.display.update()
+                time.sleep(5)
+                return
+            for item in pg.sprite.spritecollide(bird, items, True): #アイテムの取得処理
+                weapon_dict[item.item_name] += 1
 
         items.update(screen)
         bird.update(key_lst, screen)
