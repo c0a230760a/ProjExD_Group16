@@ -11,6 +11,9 @@ WIDTH = 480  # ゲームウィンドウの幅
 HEIGHT = 720  # ゲームウィンドウの高さ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+#global変数の追加
+gameround = 3
+
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
@@ -160,7 +163,14 @@ class Bomb(pg.sprite.Sprite):
             self.vx, self.vy =  random.choice(vlst)
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
-        self.speed = 6
+        if gameround == 0:  #爆弾の速度をroundごとに早くする
+            self.speed = 6
+        elif gameround == 1:
+            self.speed = 9
+        elif gameround == 2:
+            self.speed = 12
+        elif gameround == 3:
+            self.speed = 18
         self.state = "active"
         self.count = 0
         
@@ -253,10 +263,27 @@ class Enemy(pg.sprite.Sprite):
         self.image = random.choice(__class__.imgs)
         self.rect = self.image.get_rect()
         self.rect.center = random.randint(0, WIDTH), 0
-        self.vx, self.vy = 0, +6
-        self.bound = random.randint(50, HEIGHT//2)  # 停止位置
-        self.state = "down"  # 降下状態or停止状態
-        self.interval = random.randint(50, 300)  # 爆弾投下インターバル
+        if gameround == 0:
+            self.vx, self.vy = 0, +6
+            self.bound = random.randint(50, HEIGHT//2)  # 停止位置
+            self.state = "down"  # 降下状態or停止状態
+            self.interval = random.randint(50, 300)
+        elif gameround == 1:
+            self.vx, self.vy = 0, +12
+            self.bound = random.randint(50, HEIGHT//2)  # 停止位置
+            self.state = "down"  # 降下状態or停止状態
+            self.interval = random.randint(50, 250)
+        elif gameround == 2:
+            self.vx, self.vy = 0, +18
+            self.bound = random.randint(50, HEIGHT//2)  # 停止位置
+            self.state = "down"  # 降下状態or停止状態
+            self.interval = random.randint(50, 200)
+        elif gameround == 3:
+            self.vx, self.vy = 0, +24
+            self.bound = random.randint(50, HEIGHT//2)  # 停止位置
+            self.state = "down"  # 降下状態or停止状態
+            self.interval = random.randint(50, 150)
+    
 
     def update(self):
         """
@@ -268,6 +295,19 @@ class Enemy(pg.sprite.Sprite):
             self.vy = 0
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
+        
+        if gameround >= 2:
+            self.vx += 1.5 if random.choice([True,False]) else -2
+            self.rect.move_ip(self.vx, self.vy)
+            if self.rect.left < 0:
+                self.rect.left = 0
+                self.vx = 1
+            if self.rect.right > WIDTH :
+                self.rect.right = WIDTH
+                self.vx = 1
+            if self.rect.centery > self.bound:
+                self.vy = 0
+                self.state = "stop"
 
 class Gravity(pg.sprite.Sprite):
     """
@@ -782,8 +822,22 @@ def main():
             score.value -= 100
         screen.blit(bg_img, [0, 0])
 
-        # if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
-        #     emys.add(Enemy())
+        if gameround == 0:
+            if tmr%250 == 0:  # 200フレーム，敵機を出現させる
+                for _ in range(1):
+                    emys.add(Enemy())
+        elif gameround == 1:
+            if tmr%200 == 0:  # 200フレーム，敵機を出現させる
+                for _ in range(2):  # 敵機の数
+                    emys.add(Enemy())
+        elif gameround == 2:
+            if tmr%170 == 0:  # 200フレーム，敵機を出現させる
+                for _ in range(4):  # 敵機の数
+                    emys.add(Enemy())
+        elif gameround == 3:
+            if tmr%80 == 0:  # 200フレーム，敵機を出現させる
+                for _ in range(5):  # 敵機の数
+                    emys.add(Enemy())
 
         for emy in emys:
             if emy.state == "stop" and tmr%emy.interval == 0:
