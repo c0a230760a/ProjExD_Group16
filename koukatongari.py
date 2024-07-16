@@ -70,6 +70,7 @@ class Bird(pg.sprite.Sprite):
             (0, +1): pg.transform.rotozoom(img, -90, 1.0),  # 下
             (+1, +1): pg.transform.rotozoom(img, -45, 1.0),  # 右下
         }
+        self.hp = 5
         self.dire = (+1, 0)
         self.image = self.imgs[self.dire]
         self.rect = self.image.get_rect()
@@ -77,6 +78,21 @@ class Bird(pg.sprite.Sprite):
         self.speed = 10
         self.state = "normal"
         self.hyper_life = 500
+        self.is_invincible = False
+        
+    def blink(self, screen):
+        """
+        こうかとんが攻撃を受けた時に一瞬だけ戦败时の图片に変え、その後元の画像に戻る
+        """
+        self.is_invincible = True
+        original_image = self.image
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/8.png"), 0, 2.0)  # 戦败时的图片
+        screen.blit(self.image, self.rect)
+        pg.display.update()
+        time.sleep(0.1)
+        self.image = original_image
+        self.is_invincible = False
+
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -761,6 +777,16 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_o and boss_count == 0: #  boss召喚(仮)
                 bosses.add(Boss(bosshp))
                 boss_count += 1
+
+            if not bird.is_invincible and pg.sprite.spritecollide(bird, bombs, True):
+                bird.hp -= 1
+                # bird.blink(screen)  # こうかとんが攻撃を受けたらフラッシュする
+                if bird.hp <= 0:
+                    bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+                    score.update(screen)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
         """ここはテストプログラム"""
         if count == 0:
             count += 1
@@ -969,11 +995,16 @@ def main():
         
         else:
             if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
+                bird.hp -= 1
+                
+                
+            if bird.hp <= 0:
                 bird.change_img(8, screen) # こうかとん悲しみエフェクト
                 score.update(screen)
                 pg.display.update()
                 time.sleep(2)
                 return
+
 
         if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
             img2 = pg.transform.rotozoom(pg.image.load(f"fig/explosion.png"), 0, 5.0)
