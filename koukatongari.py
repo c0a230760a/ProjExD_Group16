@@ -296,12 +296,11 @@ class Enemy(pg.sprite.Sprite):
             self.bound = random.randint(50, HEIGHT//2)  # 停止位置
             self.state = "down"  # 降下状態or停止状態
             self.interval = random.randint(50, 200)
-        elif gameround == 3:
+        else:
             self.vx, self.vy = 0, +24
             self.bound = random.randint(50, HEIGHT//2)  # 停止位置
             self.state = "down"  # 降下状態or停止状態
             self.interval = random.randint(50, 150)
-    
 
     def update(self):
         """
@@ -955,7 +954,7 @@ def main():
                     bosses.add(Boss(bosshp))
                     boss_count += 1
             for emy in emys:
-                if emy.state == "stop" and tmr%emy.interval == 0:
+                if tmr%emy.interval == 0:
                     # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                     bombs.add(Bomb(emy, bird))
 
@@ -1114,6 +1113,8 @@ def main():
                 weapon_dict[item.item_name] += 1
 
         items.update(screen)
+        exps.update()
+        exps.draw(screen)
         bird.update(key_lst, screen)
         # beams.update()
         # beams.draw(screen)
@@ -1129,8 +1130,6 @@ def main():
         bombs.draw(screen)
         bombs2.update()
         bombs2.draw(screen)
-        exps.update()
-        exps.draw(screen)
         score.update(screen)
         gvys.update()
         gvys.draw(screen)
