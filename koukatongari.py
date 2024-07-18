@@ -726,7 +726,7 @@ def main():
     angle = 360 / num_barriers
     weapon_cooldown ={"bullet":7, "satellite":70, "slash":20, "boomerang":20}
     weapon_timer = {"bullet":7, "satellite":70, "slash":20, "boomerang":20}
-    weapon_dict = {"weapon_mode":0, "satellite":1, "slash":1, "boomerang":1}
+    weapon_dict = {"weapon_mode":0, "satellite":0, "slash":0, "boomerang":0}
     clock = pg.time.Clock()
 
     show_title_screen(screen)
@@ -960,17 +960,17 @@ def main():
                     gvys.add(Explosion(bomb, 50))
                     score.value += 1
 
-                if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
-                    bird.hp -= 1
-                    if bird.hp <= 0:
-                        font = pg.font.Font(None, 50)
-                        img = font.render(f"GAME OVER", 0, (0, 0, 0))
-                        rect = img.get_rect()
-                        rect.center = WIDTH//2, HEIGHT//2
-                        screen.blit(img, rect)
-                        pg.display.update()
-                        time.sleep(2)
-                        return
+            if len(pg.sprite.spritecollide(bird, bombs, True)) != 0 or len(pg.sprite.spritecollide(bird, bombs2, True)) != 0 or len(pg.sprite.spritecollide(bird, bosses, True)) != 0:
+                bird.hp -= 1
+                if bird.hp <= 0:
+                    font = pg.font.Font(None, 50)
+                    img = font.render(f"GAME OVER", 0, (0, 0, 0))
+                    rect = img.get_rect()
+                    rect.center = WIDTH//2, HEIGHT//2
+                    screen.blit(img, rect)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
 
 
             if bosses.sprites() == [] and boss_count == 1:  # boss召喚後にbossが存在しない時
